@@ -2,4 +2,4 @@
 ../Core/Src/mnist_nn.c:23:6:relu_layer	4
 ../Core/Src/mnist_nn.c:41:6:softmax10	5
 ../Core/Src/mnist_nn.c:68:6:dense_layer	5
-../Core/Src/mnist_nn.c:90:6:mnist_predict_proba	4
+../Core/Src/mnist_nn.c:90:6:mnist_predict_proba	3

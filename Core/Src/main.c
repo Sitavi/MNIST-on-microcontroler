@@ -93,7 +93,7 @@ int main(void)
   uint16_t x;
   uint16_t y;
   uint8_t touche_dessin = 0;
-  const uint16_t rayon = 5;
+  const uint16_t rayon = 7;
 
   /* USER CODE END 1 */
 
@@ -141,6 +141,9 @@ int main(void)
   BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
   largeur_ecran = BSP_LCD_GetXSize();
   hauteur_ecran = BSP_LCD_GetYSize();
+
+  // À gauche on garde un carré noir pour dessiner.
+  // Le reste de l'écran sert à afficher les probabilités.
   cote_zone_dessin = hauteur_ecran;
   x_zone_texte = cote_zone_dessin;
 
@@ -156,6 +159,7 @@ int main(void)
   {
     bp1 = HAL_GPIO_ReadPin(BP1_GPIO_Port, BP1_Pin);
 
+    // BP1 efface le dessin et le texte.
     if (bp1 == GPIO_PIN_SET && bp1_avant == GPIO_PIN_RESET)
     {
       preparer_fond(largeur_ecran, hauteur_ecran);
@@ -168,6 +172,7 @@ int main(void)
 
     if (TS_State.touchDetected)
     {
+      // Tant que le doigt est posé, on dessine seulement.
       if (TS_State.touchX[0] < cote_zone_dessin && TS_State.touchY[0] < hauteur_ecran)
       {
         touche_dessin = 1;
@@ -198,8 +203,10 @@ int main(void)
     }
     else if (touche_dessin)
     {
+      // Quand le doigt est relevé, on transforme le dessin en image 28x28
+      // puis on lance l'inférence.
       recuperer_image_mnist(image_mnist, cote_zone_dessin);
-      mnist_predict_proba(image_mnist, probabilites); // Appel du réseau de neurones ici
+      mnist_predict_proba(image_mnist, probabilites);
       afficher_probabilites(probabilites, x_zone_texte);
       touche_dessin = 0;
     }
@@ -274,6 +281,7 @@ void preparer_fond(uint16_t largeur, uint16_t hauteur)
 {
   uint16_t cote_zone_dessin = hauteur;
 
+  // La couche 0 contient le fond et le dessin.
   BSP_LCD_SelectLayer(0);
   BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
   BSP_LCD_FillRect(0, 0, cote_zone_dessin, hauteur);
@@ -287,6 +295,7 @@ void preparer_fond(uint16_t largeur, uint16_t hauteur)
 
 void effacer_texte(void)
 {
+  // La couche 1 sert juste pour le texte à droite.
   BSP_LCD_SelectLayer(1);
   BSP_LCD_Clear(0);
   BSP_LCD_SetBackColor(0);
@@ -313,6 +322,7 @@ void afficher_probabilites(const float proba[MNIST_CLASSES], uint16_t x_zone_tex
 
   for (i = 0; i < MNIST_CLASSES; i++)
   {
+    // On affiche une ligne par chiffre.
     y = 8 + i * 24;
     pourcent_dixieme = (uint16_t)(1000.0f * proba[i] + 0.5f);
 
@@ -344,9 +354,11 @@ void recuperer_image_mnist(uint8_t image[MNIST_PIXELS], uint16_t cote_zone_dessi
   uint16_t ligne;
   uint16_t colonne;
   uint16_t somme;
-  uint8_t actif;
+  uint32_t nb_pixels_blancs;
+  uint32_t nb_pixels_case;
   uint32_t pixel;
 
+  // On relit ce qui a été dessiné sur la couche 0.
   BSP_LCD_SelectLayer(0);
 
   for (ligne = 0; ligne < MNIST_H; ligne++)
@@ -358,9 +370,11 @@ void recuperer_image_mnist(uint8_t image[MNIST_PIXELS], uint16_t cote_zone_dessi
     {
       x_debut = (colonne * cote_zone_dessin) / MNIST_W;
       x_fin = ((colonne + 1) * cote_zone_dessin) / MNIST_W;
-      actif = 0;
+      nb_pixels_blancs = 0;
+      nb_pixels_case = (uint32_t)(x_fin - x_debut) * (uint32_t)(y_fin - y_debut);
 
-      for (y = y_debut; y < y_fin && actif == 0; y++)
+      // On compte combien de pixels blancs sont presents dans chaque case.
+      for (y = y_debut; y < y_fin; y++)
       {
         for (x = x_debut; x < x_fin; x++)
         {
@@ -369,13 +383,13 @@ void recuperer_image_mnist(uint8_t image[MNIST_PIXELS], uint16_t cote_zone_dessi
 
           if (somme > 0)
           {
-            actif = 1;
-            break;
+            nb_pixels_blancs++;
           }
         }
       }
 
-      image[ligne * MNIST_W + colonne] = actif;
+      image[ligne * MNIST_W + colonne] =
+          (uint8_t)((255u * nb_pixels_blancs + nb_pixels_case / 2u) / nb_pixels_case);
     }
   }
 }

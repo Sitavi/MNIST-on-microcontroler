@@ -1,8 +1,8 @@
 ../Core/Src/main.c:80:5:main	11
-../Core/Src/main.c:218:6:SystemClock_Config	4
-../Core/Src/main.c:273:6:preparer_fond	1
-../Core/Src/main.c:288:6:effacer_texte	1
-../Core/Src/main.c:296:6:afficher_probabilites	5
-../Core/Src/main.c:336:6:recuperer_image_mnist	7
-../Core/Src/main.c:394:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:412:6:Error_Handler	1
+../Core/Src/main.c:225:6:SystemClock_Config	4
+../Core/Src/main.c:280:6:preparer_fond	1
+../Core/Src/main.c:296:6:effacer_texte	1
+../Core/Src/main.c:305:6:afficher_probabilites	5
+../Core/Src/main.c:346:6:recuperer_image_mnist	6
+../Core/Src/main.c:408:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:426:6:Error_Handler	1

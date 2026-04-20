@@ -97,11 +97,9 @@ void mnist_predict_proba(const uint8_t image[MNIST_PIXELS], float probabilities[
   float output_scores[MNIST_CLASSES];
 
   for (int i = 0; i < MNIST_PIXELS; ++i) {
-    if (image[i] == 0u) {
-      first_layer_input[i] = 0;
-    } else {
-      first_layer_input[i] = MNIST_LAYER_1_INPUT_DELTA_Q;
-    }
+    // On etale le niveau de gris entre 0 et la valeur d'entree max quantifiee.
+    first_layer_input[i] =
+        ((int32_t)image[i] * MNIST_LAYER_1_INPUT_DELTA_Q + 127) / 255;
   }
 
   dense_layer(first_layer_input, mnist_layer_1_weights_q, mnist_layer_1_base_q,
