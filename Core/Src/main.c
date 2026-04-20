@@ -34,11 +34,8 @@
 /* USER CODE BEGIN Includes */
 #include "stm32746g_discovery_lcd.h"
 #include "stm32746g_discovery_ts.h"
-#include "stdio.h"
-#include "HorombeRGB565.h"
-#include "train-bord-de-mer_0.h"
-#include <string.h>
-#include <stdlib.h>
+#include "mnist_nn.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,49 +55,16 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
-//minicom -D /dev/ttyACM0
-
-uint32_t potl,potr,joystick_h,joystick_v,bp1,bp2;
-TS_StateTypeDef  TS_State;
-ADC_ChannelConfTypeDef sConfig = {0};
-
-RTC_TimeTypeDef sTime;
-RTC_DateTypeDef sDate;
-uint32_t date_time_format = RTC_FORMAT_BIN;
-uint32_t drawing_color = 0;
-
-
-GPIO_TypeDef* LED_PORT[8] = {
-		LED18_GPIO_Port,
-		LED17_GPIO_Port,
-		LED16_GPIO_Port,
-		LED15_GPIO_Port,
-		LED14_GPIO_Port,
-		LED13_GPIO_Port,
-		LED12_GPIO_Port,
-		LED11_GPIO_Port
-	};
-
-uint16_t LED_PIN[8] = {
-		LED18_Pin,
-		LED17_Pin,
-		LED16_Pin,
-		LED15_Pin,
-		LED14_Pin,
-		LED13_Pin,
-		LED12_Pin,
-		LED11_Pin
-	};
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 
-void update_inputs(void);
-void afficher_leds(uint16_t adc_value);
+void preparer_fond(uint16_t largeur, uint16_t hauteur);
+void effacer_texte(void);
+void afficher_probabilites(const float proba[MNIST_CLASSES], uint16_t x_zone_texte);
+void recuperer_image_mnist(uint8_t image[MNIST_PIXELS], uint16_t cote_zone_dessin);
 
 /* USER CODE END PFP */
 
@@ -117,15 +81,19 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	char text[60]={};
-	sConfig.Rank = ADC_REGULAR_RANK_1;
-	sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-
-	typedef enum {
-	    ETAT_INIT,
-		ETAT_1,
-		ETAT_2
-	} Etat_t;
+  TS_StateTypeDef TS_State;
+  GPIO_PinState bp1;
+  GPIO_PinState bp1_avant;
+  uint8_t image_mnist[MNIST_PIXELS];
+  float probabilites[MNIST_CLASSES];
+  uint16_t largeur_ecran;
+  uint16_t hauteur_ecran;
+  uint16_t cote_zone_dessin;
+  uint16_t x_zone_texte;
+  uint16_t x;
+  uint16_t y;
+  uint8_t touche_dessin = 0;
+  const uint16_t rayon = 5;
 
   /* USER CODE END 1 */
 
@@ -170,21 +138,15 @@ int main(void)
   BSP_LCD_LayerDefaultInit(0, LCD_FB_START_ADDRESS);
   BSP_LCD_LayerDefaultInit(1, LCD_FB_START_ADDRESS+ BSP_LCD_GetXSize()*BSP_LCD_GetYSize()*4);
   BSP_LCD_DisplayOn();
-  BSP_LCD_SelectLayer(0);
-  BSP_LCD_Clear(LCD_COLOR_RED);
-  BSP_LCD_DrawBitmap(0,0,(uint8_t*)train_bord_de_mer_0_bmp);
-  BSP_LCD_SelectLayer(1);
-  BSP_LCD_Clear(00);
-  BSP_LCD_SetFont(&Font16);
-  BSP_LCD_SetTextColor(LCD_COLOR_ORANGE);
-  BSP_LCD_SetBackColor(00);
-
   BSP_TS_Init(BSP_LCD_GetXSize(), BSP_LCD_GetYSize());
+  largeur_ecran = BSP_LCD_GetXSize();
+  hauteur_ecran = BSP_LCD_GetYSize();
+  cote_zone_dessin = hauteur_ecran;
+  x_zone_texte = cote_zone_dessin;
 
-
-  Etat_t etat = ETAT_INIT;
-
-
+  preparer_fond(largeur_ecran, hauteur_ecran);
+  effacer_texte();
+  bp1_avant = HAL_GPIO_ReadPin(BP1_GPIO_Port, BP1_Pin);
 
   /* USER CODE END 2 */
 
@@ -192,125 +154,55 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  switch(etat){
+    bp1 = HAL_GPIO_ReadPin(BP1_GPIO_Port, BP1_Pin);
 
-	  case ETAT_INIT:
-		// Send
-		sprintf(text,"Enter hours:\n\r");
-		HAL_UART_Transmit(&huart1, (uint8_t*)text, strlen((char*)text), 100);
+    if (bp1 == GPIO_PIN_SET && bp1_avant == GPIO_PIN_RESET)
+    {
+      preparer_fond(largeur_ecran, hauteur_ecran);
+      effacer_texte();
+      touche_dessin = 0;
+    }
+    bp1_avant = bp1;
 
-		// Init hours
-		uint8_t hours[3];
-		if(HAL_UART_Receive(&huart1, hours, 2, 30000)==HAL_OK){
-		  hours[3] = '\0'; // null-terminate
-		};
-		sTime.Hours = atoi((char*)hours);
+    BSP_TS_GetState(&TS_State);
 
-		// Send
-		sprintf(text,"Enter minutes:\n\r");
-		HAL_UART_Transmit(&huart1, (uint8_t*)text, strlen((char*)text), 100);
+    if (TS_State.touchDetected)
+    {
+      if (TS_State.touchX[0] < cote_zone_dessin && TS_State.touchY[0] < hauteur_ecran)
+      {
+        touche_dessin = 1;
+        x = TS_State.touchX[0];
+        y = TS_State.touchY[0];
 
-		// Init minutes
-		uint8_t minutes[3];
-		if(HAL_UART_Receive(&huart1, minutes, 2, 30000)==HAL_OK){
-		  minutes[3] = '\0'; // null-terminate
-		};
-		sTime.Minutes = atoi((char*)minutes);
+        if (x < rayon)
+        {
+          x = rayon;
+        }
+        if (x > cote_zone_dessin - rayon - 1)
+        {
+          x = cote_zone_dessin - rayon - 1;
+        }
+        if (y < rayon)
+        {
+          y = rayon;
+        }
+        if (y > hauteur_ecran - rayon - 1)
+        {
+          y = hauteur_ecran - rayon - 1;
+        }
 
-		sTime.Seconds = 0;
-
-		HAL_RTC_SetTime(&hrtc, &sTime, date_time_format);
-
-	  	update_inputs();
-
-	  	etat = ETAT_1;
-		break;
-
-	  case ETAT_1:
-		  update_inputs();
-
-		  // Send
-			HAL_RTC_GetDate(&hrtc, &sDate, date_time_format);
-			HAL_RTC_GetTime(&hrtc, &sTime, date_time_format);
-
-			sprintf(text,"Time : %d:%d:%d",sTime.Hours, sTime.Minutes, sTime.Seconds);
-			BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
-			BSP_LCD_DisplayStringAtLine(1,(uint8_t*) text);
-			sprintf(text,"Time : %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);
-			HAL_UART_Transmit(&huart1, (uint8_t*)text, strlen((char*)text), 100);
-
-			 afficher_leds(joystick_v);
-
-			  if(!(bp1 || bp2)){
-				  BSP_LCD_SelectLayer(0);
-				  BSP_LCD_DrawBitmap(0,0,(uint8_t*)train_bord_de_mer_0_bmp);
-				  BSP_LCD_SelectLayer(1);
-			  }
-
-			  if(TS_State.touchDetected){
-				  //On vérifie que le cercle de rayon 4 dessiné autour du point sera bien sur l'écran
-				  if((TS_State.touchX[0]>4) && (TS_State.touchX[0]<476) && (TS_State.touchY[0]>4) && (TS_State.touchY[0]<268)){
-					  BSP_LCD_SelectLayer(0);
-					  BSP_LCD_SetTextColor(~drawing_color);
-					  BSP_LCD_FillEllipse(TS_State.touchX[0],TS_State.touchY[0], 4, 6);
-					  BSP_LCD_SetTextColor(drawing_color);
-					  BSP_LCD_FillCircle(TS_State.touchX[0],TS_State.touchY[0],2);
-					  BSP_LCD_SelectLayer(1);
-					  drawing_color+=10000;
-				  }
-			  }
-
-		  if(TS_State.touchDetected && TS_State.touchX[0]>240){
-			  BSP_LCD_Clear(00);
-			  etat = ETAT_2;
-		  }
-		  break;
-
-	  case ETAT_2:
-		  update_inputs();
-
-		  // Send
-//		  HAL_GPIO_WritePin(LED13_GPIO_Port,LED13_Pin,bp1);
-//		  HAL_GPIO_WritePin(LED14_GPIO_Port,LED14_Pin,bp2);
-		  sprintf(text,"BP1 : %d BP2 : %d",bp1,bp2);
-		  BSP_LCD_SetTextColor(LCD_COLOR_MAGENTA);
-		  BSP_LCD_DisplayStringAtLine(1,(uint8_t*) text);
-
-		  sprintf(text,"POTL : %4u POTR : %4u",(uint16_t)potl,(uint16_t)potr);
-		  BSP_LCD_SetTextColor(LCD_COLOR_RED);
-		  BSP_LCD_DisplayStringAtLine(2,(uint8_t*) text);
-
-		  sprintf(text,"joy_v : %4u joy_h : %4u",(uint16_t)joystick_v,(uint16_t)joystick_h);
-		  BSP_LCD_SetTextColor(LCD_COLOR_ORANGE);
-		  BSP_LCD_DisplayStringAtLine(3,(uint8_t*) text);
-
-		  if(!(bp1 || bp2)){
-			  BSP_LCD_SelectLayer(0);
-			  BSP_LCD_DrawBitmap(0,0,(uint8_t*)train_bord_de_mer_0_bmp);
-			  BSP_LCD_SelectLayer(1);
-		  }
-
-		  afficher_leds(joystick_h);
-
-		  if(TS_State.touchDetected){
-			  //On vérifie que le cercle de rayon 4 dessiné autour du point sera bien sur l'écran
-			  if((TS_State.touchX[0]>4) && (TS_State.touchX[0]<476) && (TS_State.touchY[0]>4) && (TS_State.touchY[0]<268)){
-				  BSP_LCD_SelectLayer(0);
-				  BSP_LCD_SetTextColor(~drawing_color);
-				  BSP_LCD_FillEllipse(TS_State.touchX[0],TS_State.touchY[0], 6, 4);
-				  BSP_LCD_SetTextColor(drawing_color);
-				  BSP_LCD_FillCircle(TS_State.touchX[0],TS_State.touchY[0],2);
-				  BSP_LCD_SelectLayer(1);
-				  drawing_color+=10000;
-			  }
-		  }
-
-		  if(TS_State.touchDetected && TS_State.touchX[0]<241){
-			  BSP_LCD_Clear(00);
-			  etat = ETAT_1;
-			}
-		  break;
-	  }
+        BSP_LCD_SelectLayer(0);
+        BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+        BSP_LCD_FillCircle(x, y, rayon);
+      }
+    }
+    else if (touche_dessin)
+    {
+      recuperer_image_mnist(image_mnist, cote_zone_dessin);
+      mnist_predict_proba(image_mnist, probabilites); // Appel du réseau de neurones ici
+      afficher_probabilites(probabilites, x_zone_texte);
+      touche_dessin = 0;
+    }
 
     /* USER CODE END WHILE */
 
@@ -378,54 +270,114 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-void update_inputs(void){
-	// Lecture des boutons
-	bp1 = HAL_GPIO_ReadPin(BP1_GPIO_Port,BP1_Pin);
-	bp2 = HAL_GPIO_ReadPin(BP2_GPIO_Port,BP2_Pin);
+void preparer_fond(uint16_t largeur, uint16_t hauteur)
+{
+  uint16_t cote_zone_dessin = hauteur;
 
-	// Lecture des entrées-sorties analogiques
-	sConfig.Channel = ADC_CHANNEL_6;
-	HAL_ADC_ConfigChannel(&hadc3, &sConfig);
-	HAL_ADC_Start(&hadc3);
-	while(HAL_ADC_PollForConversion(&hadc3, 100)!=HAL_OK);
-	potr = HAL_ADC_GetValue(&hadc3);
+  BSP_LCD_SelectLayer(0);
+  BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+  BSP_LCD_FillRect(0, 0, cote_zone_dessin, hauteur);
 
-	sConfig.Channel = ADC_CHANNEL_7;
-	HAL_ADC_ConfigChannel(&hadc3, &sConfig);
-	HAL_ADC_Start(&hadc3);
-	while(HAL_ADC_PollForConversion(&hadc3, 100)!=HAL_OK);
-	potl = HAL_ADC_GetValue(&hadc3);
+  BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+  BSP_LCD_FillRect(cote_zone_dessin, 0, largeur - cote_zone_dessin, hauteur);
 
-	sConfig.Channel = ADC_CHANNEL_8;
-	HAL_ADC_ConfigChannel(&hadc3, &sConfig);
-	HAL_ADC_Start(&hadc3);
-	while(HAL_ADC_PollForConversion(&hadc3, 100)!=HAL_OK);
-	joystick_v = HAL_ADC_GetValue(&hadc3);
-
-	HAL_ADC_Start(&hadc1);
-	while(HAL_ADC_PollForConversion(&hadc1, 100)!=HAL_OK);
-	joystick_h = HAL_ADC_GetValue(&hadc1);
-
-	// Lecture de l'écran tactile
-	BSP_TS_GetState(&TS_State);
+  BSP_LCD_SetTextColor(LCD_COLOR_LIGHTGRAY);
+  BSP_LCD_FillRect(cote_zone_dessin, 0, 2, hauteur);
 }
 
-void afficher_leds(uint16_t adc_value)
+void effacer_texte(void)
 {
-    uint8_t nb_leds;
-    uint8_t i;
+  BSP_LCD_SelectLayer(1);
+  BSP_LCD_Clear(0);
+  BSP_LCD_SetBackColor(0);
+  BSP_LCD_SetFont(&Font12);
+}
 
-    nb_leds = (adc_value * 8) / 4096 + 1;  // 0..12
+void afficher_probabilites(const float proba[MNIST_CLASSES], uint16_t x_zone_texte)
+{
+  char texte[40];
+  uint8_t i;
+  uint8_t i_max = 0;
+  uint16_t y;
+  uint16_t pourcent_dixieme;
 
-    if (nb_leds > 8)
-        nb_leds = 8;
-
-    for (i = 0; i < 8; i++) {
-        if (i < nb_leds)
-            HAL_GPIO_WritePin(LED_PORT[i], LED_PIN[i], GPIO_PIN_SET);
-        else
-            HAL_GPIO_WritePin(LED_PORT[i], LED_PIN[i], GPIO_PIN_RESET);
+  for (i = 1; i < MNIST_CLASSES; i++)
+  {
+    if (proba[i] > proba[i_max])
+    {
+      i_max = i;
     }
+  }
+
+  effacer_texte();
+
+  for (i = 0; i < MNIST_CLASSES; i++)
+  {
+    y = 8 + i * 24;
+    pourcent_dixieme = (uint16_t)(1000.0f * proba[i] + 0.5f);
+
+    if (i == i_max)
+    {
+      BSP_LCD_SetFont(&Font16);
+      BSP_LCD_SetTextColor(LCD_COLOR_RED);
+      sprintf(texte, "> %d : %3u.%1u %%", i, pourcent_dixieme / 10, pourcent_dixieme % 10);
+    }
+    else
+    {
+      BSP_LCD_SetFont(&Font12);
+      BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+      sprintf(texte, "  %d : %3u.%1u %%", i, pourcent_dixieme / 10, pourcent_dixieme % 10);
+    }
+
+    BSP_LCD_DisplayStringAt(x_zone_texte + 10, y, (uint8_t *)texte, LEFT_MODE);
+  }
+}
+
+void recuperer_image_mnist(uint8_t image[MNIST_PIXELS], uint16_t cote_zone_dessin)
+{
+  uint16_t x_debut;
+  uint16_t x_fin;
+  uint16_t y_debut;
+  uint16_t y_fin;
+  uint16_t x;
+  uint16_t y;
+  uint16_t ligne;
+  uint16_t colonne;
+  uint16_t somme;
+  uint8_t actif;
+  uint32_t pixel;
+
+  BSP_LCD_SelectLayer(0);
+
+  for (ligne = 0; ligne < MNIST_H; ligne++)
+  {
+    y_debut = (ligne * cote_zone_dessin) / MNIST_H;
+    y_fin = ((ligne + 1) * cote_zone_dessin) / MNIST_H;
+
+    for (colonne = 0; colonne < MNIST_W; colonne++)
+    {
+      x_debut = (colonne * cote_zone_dessin) / MNIST_W;
+      x_fin = ((colonne + 1) * cote_zone_dessin) / MNIST_W;
+      actif = 0;
+
+      for (y = y_debut; y < y_fin && actif == 0; y++)
+      {
+        for (x = x_debut; x < x_fin; x++)
+        {
+          pixel = BSP_LCD_ReadPixel(x, y);
+          somme = ((pixel >> 16) & 0xFF) + ((pixel >> 8) & 0xFF) + (pixel & 0xFF);
+
+          if (somme > 0)
+          {
+            actif = 1;
+            break;
+          }
+        }
+      }
+
+      image[ligne * MNIST_W + colonne] = actif;
+    }
+  }
 }
 
 
