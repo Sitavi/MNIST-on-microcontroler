@@ -78,7 +78,7 @@ Le principe est le suivant :
 4. conversion de chaque case en un niveau de gris entre `0` et `255`
 5. passage de cette image au réseau de neurones
 
-Autrement dit, on ne conserve plus seulement une information binaire "pixel actif / pixel inactif". On conserve désormais un niveau de remplissage par case, ce qui permet de mieux représenter l'épaisseur locale du tracé.
+Autrement dit, on ne conserve pas seulement une information binaire "pixel actif / pixel inactif". On conserve un niveau de remplissage par case, ce qui permet de mieux représenter l'épaisseur locale du tracé.
 
 ### Schéma de traitement
 
