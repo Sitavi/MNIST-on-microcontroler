@@ -157,7 +157,7 @@ Le modèle d'origine a ensuite été exporté puis quantifié en `int8` afin d'�
 
 Ce travail a permis de mettre en œuvre une chaîne complète de reconnaissance de chiffres manuscrits sur microcontrôleur STM32, depuis le dessin sur l'écran tactile jusqu'au calcul des probabilités de sortie du réseau. L'ensemble repose sur une implémentation en C, avec un réseau de neurones multicouche quantifié et intégré directement dans le projet.
 
-Le projet montre qu'une inférence de type MNIST peut être réalisée de manière embarquée sur une carte STM32F746, avec une interface utilisateur simple et un coût mémoire maîtrisé grâce à la quantification des poids. En pratique, la reconnaissance fonctionne correctement dans de nombreux cas, même si le système peut encore se tromper pour certains tracés. L'ajout d'un prétraitement fondé sur le taux de remplissage de chaque case `28 x 28` permet en outre de conserver davantage d'information sur le tracé qu'une représentation strictement binaire.
+Nous avons vu qu'une inférence de type MNIST peut être réalisée de manière embarquée sur une carte STM32F746, avec une interface utilisateur simple et un coût mémoire maîtrisé grâce à la quantification des poids. En pratique, la reconnaissance fonctionne correctement dans de nombreux cas, même si le système peut encore se tromper pour certains tracés. L'ajout d'un prétraitement fondé sur le taux de remplissage de chaque case `28 x 28` permet en outre de conserver davantage d'information sur le tracé qu'une représentation strictement binaire.
 
 ## Références
 
