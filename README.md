@@ -159,6 +159,8 @@ Ce travail a permis de mettre en œuvre une chaîne complète de reconnaissance 
 
 Nous avons vu qu'une inférence de type MNIST peut être réalisée de manière embarquée sur une carte STM32F746, avec une interface utilisateur simple et un coût mémoire maîtrisé grâce à la quantification des poids. En pratique, la reconnaissance fonctionne correctement dans de nombreux cas, même si le système peut encore se tromper pour certains tracés. L'ajout d'un prétraitement fondé sur le taux de remplissage de chaque case `28 x 28` permet en outre de conserver davantage d'information sur le tracé qu'une représentation strictement binaire.
 
+![ecran](/img/screen.jpeg)
+
 ## Références
 
 - [`dacorvo/mnist-mlp`](https://huggingface.co/dacorvo/mnist-mlp)
