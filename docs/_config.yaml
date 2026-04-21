@@ -1,2 +1,4 @@
 theme: jekyll-theme-cayman
 baseurl: "/MNIST-on-microcontroler"
+include:
+  - _includes
