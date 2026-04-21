@@ -4,23 +4,22 @@
 
 #include "mnist_nn.h"
 
-// Poids MNIST quantifies en int8.
-// Source : modele pre-entraine Hugging Face "dacorvo/mnist-mlp".
-// Architecture d'origine : 784 -> 256 -> 256 -> 10 (ReLU).
-// Entree attendue : image binarisee 0/1.
+// Poids quantifiés en int8
+// Modèle pré-entrainé provenant de Hugging Face "dacorvo/mnist-mlp"
+// Architecture d'origine : 784 -> 256 -> 256 -> 10 (ReLU)
 
 #define MNIST_HIDDEN 256u
 
-// layer_1 : entree -> couche cachee 1
-// layer_2 : couche cachee 1 -> couche cachee 2
-// layer_3 : couche cachee 2 -> sortie
+// layer_1 : entrée -> couche cachée 1
+// layer_2 : couche cachée 1 -> couche cachée 2
+// layer_3 : couche cachée 2 -> sortie
 
-// Quantification entree (x_norm=(x-mean)/std, x dans {0,1})
+// Quantification entrée
 #define MNIST_LAYER_1_INPUT_Q0 (-19)
 #define MNIST_LAYER_1_INPUT_Q1 (127)
 #define MNIST_LAYER_1_INPUT_DELTA_Q (MNIST_LAYER_1_INPUT_Q1 - MNIST_LAYER_1_INPUT_Q0)
 
-// Requantization: q = round(x * mul_q / 2^MNIST_MUL_SHIFT)
+// Requantification
 #define MNIST_MUL_SHIFT 20
 
 static const int32_t mnist_layer_1_requant_mul = 570;

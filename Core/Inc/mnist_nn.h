@@ -2,13 +2,13 @@
 
 #include <stdint.h>
 
-// Parametres MNIST
+// Paramètres MNIST
 #define MNIST_W 28
 #define MNIST_H 28
 #define MNIST_PIXELS 784
 #define MNIST_CLASSES 10
 
-// Parametres de quantification
+// Paramètres de quantification
 #define MNIST_ACT_MIN 0
 #define MNIST_ACT_MAX 127
 
