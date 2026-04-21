@@ -1,4 +1,16 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+
 <script>
-  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+  mermaid.initialize({ startOnLoad: false });
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("code.language-mermaid").forEach((block) => {
+      const div = document.createElement("div");
+      div.classList.add("mermaid");
+      div.innerHTML = block.textContent;
+      block.parentElement.replaceWith(div);
+    });
+
+    mermaid.init();
+  });
 </script>
